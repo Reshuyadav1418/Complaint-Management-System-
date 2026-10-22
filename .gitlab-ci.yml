@@ -1,0 +1,37 @@
+# Runs on every push and merge request.
+stages: [test, build]
+
+variables:
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+
+cache:
+  key: { files: [server/package-lock.json, client/package-lock.json] }
+  paths: [.npm/]
+
+api-tests:
+  stage: test
+  image: node:22
+  script:
+    - cd server
+    - npm ci
+    # Starts a throwaway MongoDB replica set (downloads the binary once).
+    - npm test
+
+dependency-audit:
+  stage: test
+  image: node:22
+  script:
+    - cd server && npm ci --omit=dev && npm audit --omit=dev --audit-level=high
+    # Runtime (shipped) client dependencies; Tailwind and Vite are build-time only.
+    - cd ../client && npm ci && npm audit --omit=dev --audit-level=high
+
+web-build:
+  stage: build
+  image: node:22
+  script:
+    - cd client
+    - npm ci
+    - npm run build
+  artifacts:
+    paths: [client/dist/]
+    expire_in: 1 week
